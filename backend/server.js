@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import uploadRoutes from "./routes/uploadRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -15,7 +16,9 @@ app.use(express.json());
 app.use(cors([]));
 
 app.use("/auth", authRoutes);
-app.use("/api", uploadRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/reports", reportRoutes)
+
 
 app.listen(PORT, ()=> {
     console.log(`Server is running on ${PORT}`)
