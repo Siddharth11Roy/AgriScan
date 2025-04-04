@@ -1,86 +1,103 @@
-import {createContext, useState, useEffect} from "react";
-import {useNavigate} from "react-router-dom";
+import { createContext, useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 
 const AuthContext = createContext();
 
-export const AuthProvider = ({children}) => {
+export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(null); // 🔥 Fix: Start as null
     const navigate = useNavigate();
+    const location = useLocation();
 
     useEffect(() => {
-        try {
-            const storedUser = localStorage.getItem("user");
-            if (storedUser && storedUser !== "undefined") {
-                setUser(JSON.parse(storedUser));
-            } else {
-                setUser(null);
-            }
-        } catch (error) {
-            console.error("Error parsing stored user data:", error);
+        const token = localStorage.getItem("token");
+        const storedUser = localStorage.getItem("user");
+
+        console.log("🔄 Checking Auth - Path:", location.pathname, "Token:", token);
+
+        if (token && storedUser) {
+            setUser(JSON.parse(storedUser));
+            setIsAuthenticated(true);
+            axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+        } else {
             setUser(null);
-            localStorage.removeItem("user"); // Clean up invalid data
+            setIsAuthenticated(false);
+            delete axios.defaults.headers.common["Authorization"];
+
+            if (!["/login", "/signup"].includes(location.pathname)) {
+                navigate("/login", { replace: true });
+            }
         }
-    }, []);
+    }, []); // ✅ Runs only on mount
 
     const signup = async (name, email, password) => {
         try {
-            const { data } = await axios.post("http://localhost:5000/auth/signup", {
+            const { data } = await axios.post("https://agriback-mj37.onrender.com/auth/signup", {
                 name,
                 email,
                 password,
             });
 
-            if (data && data.user) {
+            if (data?.user && data?.token) {
                 setUser(data.user);
+                setIsAuthenticated(true);
                 localStorage.setItem("user", JSON.stringify(data.user));
                 localStorage.setItem("token", data.token);
+                axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
                 navigate("/dashboard");
             }
         } catch (error) {
-            if(error.response){
-                console.error("Signup error:", error.response.data.error);
-                return error.response.data; // Return error for handling in component
-            } else {
-                console.error("Signup error:", error);
-                return { error: "Connection error. Please try again." };
-            }
+            console.error("❌ Signup error:", error.response?.data?.error || "Connection error");
         }
     };
 
     const login = async (email, password) => {
         try {
-            const { data } = await axios.post("http://localhost:5000/auth/login", {
+            const { data } = await axios.post("https://agriback-mj37.onrender.com/auth/login", {
                 email,
                 password,
             });
 
-            if (data && data.user) {
-                setUser(data.user);
-                localStorage.setItem("user", JSON.stringify(data.user));
+            console.log("🔥 API Response:", data);
+
+            // Check if token exists directly in the response
+            if (data?.token) {
+                console.log("✅ Login successful - Token:", data.token);
+
+                // Either store the entire data object as user or extract relevant fields
+                const userData = {
+                    id: data._id,
+                    name: data.name,
+                    email: data.email
+                };
+
                 localStorage.setItem("token", data.token);
+                localStorage.setItem("user", JSON.stringify(userData));
+
+                setUser(userData);
+                setIsAuthenticated(true);
+                axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
                 navigate("/dashboard");
+            } else {
+                console.error("❌ Login failed: No token received");
             }
         } catch (error) {
-            if(error.response){
-                console.error("Login error:", error.response.data.error);
-                return error.response.data; // Return error for handling in component
-            } else {
-                console.error("Login error:", error);
-                return { error: "Connection error. Please try again." };
-            }
+            console.error("❌ Login error:", error.response?.data?.error || "Login failed.");
         }
     };
 
     const logout = () => {
         setUser(null);
+        setIsAuthenticated(false);
         localStorage.removeItem("user");
-        localStorage.removeItem("token"); // Also remove token
-        navigate("/login");
+        localStorage.removeItem("token");
+        delete axios.defaults.headers.common["Authorization"];
+        navigate("/login", { replace: true });
     };
 
     return (
-        <AuthContext.Provider value={{user, signup, login, logout}}>
+        <AuthContext.Provider value={{ user, isAuthenticated, signup, login, logout }}>
             {children}
         </AuthContext.Provider>
     );
