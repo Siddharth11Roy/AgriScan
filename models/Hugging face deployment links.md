@@ -1,3 +1,5 @@
+Due to large model size, the models have been deployed on Hugging face using Gradio Client.
+
 Cow disease detection - https://huggingface.co/spaces/Sid26Roy/cow_disease | 
 
 Plant disease detection - https://huggingface.co/spaces/Sid26Roy/Farmer_prediction |
